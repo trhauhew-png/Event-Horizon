@@ -243,11 +243,219 @@
     else if (rnd < 0.4) { zone='Vàng'; text='Bạn nằm trong vùng chuẩn bị. Chuẩn bị di chuyển.' }
     else { zone='Xanh'; text='Bạn an toàn, theo dõi thông báo.' }
     alert('Kết quả kiểm tra cho "'+a+'": vùng ' + zone + '\n' + text);
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Horizon</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      color: #e2e8f0;
+      background: black;
+      overflow-x: hidden;
+    }
+
+    /* Background vũ trụ động */
+    canvas#bgStars {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: -1;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 3rem;
+      margin: 20px 0;
+      color: #38bdf8;
+      text-shadow: 0 0 20px #0ea5e9, 0 0 40px #38bdf8;
+      animation: pulse 3s infinite alternate;
+    }
+
+    @keyframes pulse {
+      from { text-shadow: 0 0 20px #0ea5e9; }
+      to   { text-shadow: 0 0 40px #38bdf8; }
+    }
+
+    section {
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 12px;
+    }
+
+    .card {
+      background: rgba(0,0,0,0.4);
+      padding: 15px;
+      border-radius: 10px;
+      margin-bottom: 12px;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    button {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 6px;
+      background: #38bdf8;
+      color: black;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    button:hover {
+      background: #0ea5e9;
+    }
+
+    .small {
+      font-size: 12px;
+      opacity: 0.7;
+    }
+
+    #qrCode {
+      margin-top: 20px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="bgStars"></canvas>
+
+  <h1>🌌 Event Horizon 🌌</h1>
+
+  <!-- Khối hiển thị dữ liệu NASA -->
+  <section>
+    <h2>Thiên thạch sắp tới (NASA NEO)</h2>
+    <div style="margin-bottom:8px;">
+      <label>API key NASA:
+        <input id="nasaKey" value="DEMO_KEY" style="width:200px">
+      </label>
+      <button id="btnFetch">Lấy dữ liệu</button>
+    </div>
+    <div id="neoList">Chưa có dữ liệu.</div>
+    <div class="small">⚠ Dữ liệu NASA mang tính giáo dục, chưa phải cảnh báo chính thức.</div>
+  </section>
+
+  <!-- QR Code -->
+  <section id="qrCode">
+    <h2>Chia sẻ trang web</h2>
+    <canvas id="qrcode"></canvas>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+  <script>
+    // === Vẽ nền sao động ===
+    const canvas = document.getElementById('bgStars');
+    const ctx = canvas.getContext('2d');
+    let stars = [];
+    function resizeCanvas(){
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      stars = Array.from({length:150}, ()=>({
+        x: Math.random()*canvas.width,
+        y: Math.random()*canvas.height,
+        r: Math.random()*1.5,
+        s: Math.random()*0.5
+      }));
+    }
+    function animateStars(){
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      ctx.fillStyle = "white";
+      stars.forEach(star=>{
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.r, 0, Math.PI*2);
+        ctx.fill();
+        star.y += star.s;
+        if(star.y > canvas.height) star.y = 0;
+      });
+      requestAnimationFrame(animateStars);
+    }
+    resizeCanvas();
+    animateStars();
+    window.addEventListener('resize', resizeCanvas);
+
+    // === QR Code cho URL trang hiện tại ===
+    const qrCanvas = document.getElementById('qrcode');
+    QRCode.toCanvas(qrCanvas, window.location.href, function (error) {
+      if (error) console.error(error);
+    });
+
+    // === Hàm xử lý NEO NASA ===
+    const EARTH_RADIUS_KM = 6371;
+    function prettyNumber(x){
+      if (x >= 1e12) return (x/1e12).toFixed(2)+' T';
+      if (x >= 1e9) return (x/1e9).toFixed(2)+' G';
+      if (x >= 1e6) return (x/1e6).toFixed(2)+' M';
+      if (x >= 1e3) return (x/1e3).toFixed(2)+' k';
+      return x.toFixed(2);
+    }
+    function estimateMass(d_min, d_max, density=2500){
+      const d = (d_min+d_max)/2;
+      const r = d/2;
+      const V = (4/3)*Math.PI*Math.pow(r,3);
+      const m = density*V;
+      return {d, m};
+    }
+    function renderNeoItem(neo, ca){
+      const diamMin = neo.estimated_diameter.meters.estimated_diameter_min;
+      const diamMax = neo.estimated_diameter.meters.estimated_diameter_max;
+      const {d,m} = estimateMass(diamMin,diamMax);
+      const miss_km = parseFloat(ca.miss_distance.kilometers);
+      const vel = parseFloat(ca.relative_velocity.kilometers_per_second);
+      const energy = 0.5*m*Math.pow(vel*1000,2)/4.184e15; // Mt TNT
+      return `
+        <div class="card">
+          <b>${neo.name}</b><br>
+          Đường kính TB: ${d.toFixed(1)} m<br>
+          Khối lượng: ${prettyNumber(m)} kg<br>
+          Vận tốc: ${vel.toFixed(2)} km/s<br>
+          Khoảng cách gần nhất: ${prettyNumber(miss_km)} km<br>
+          Năng lượng nếu va chạm: ${energy.toFixed(3)} Mt TNT<br>
+          Ngày tiếp cận: ${ca.close_approach_date_full}
+        </div>
+      `;
+    }
+    async function fetchNEO(apiKey){
+      const today = new Date().toISOString().slice(0,10);
+      const next7 = new Date(Date.now()+7*86400000).toISOString().slice(0,10);
+      const url = `https://api.nasa.gov/neo/rest/v1/feed?start_date=${today}&end_date=${next7}&api_key=${apiKey}`;
+      const res = await fetch(url);
+      return res.json();
+    }
+    document.getElementById('btnFetch').addEventListener('click', async ()=>{
+      const key = document.getElementById('nasaKey').value.trim();
+      const neoList = document.getElementById('neoList');
+      neoList.innerHTML = "Đang tải...";
+      try {
+        const data = await fetchNEO(key);
+        const all = [];
+        Object.values(data.near_earth_objects).forEach(day=>{
+          day.forEach(neo=>{
+            neo.close_approach_data.forEach(ca=>{
+              all.push(renderNeoItem(neo, ca));
+            });
+          });
+        });
+        neoList.innerHTML = all.join("");
+      } catch(e){
+        neoList.innerHTML = "Lỗi khi lấy dữ liệu: "+e.message;
+      }
+    });
+  </script>
+</body>
+</html>
+
+
   });
 
 </script>
 </body>
 </html>
 <title>Event Horizon</title>
+
 
 
