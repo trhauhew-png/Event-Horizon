@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Hệ thống Cảnh báo Thiên thạch - Demo</title>
+  <style>
+    :root{--bg:#0f1724;--card:#0b1220;--accent:#6ee7b7;--danger:#ff4d4f;--warn:#ffb020;--safe:#38bdf8;color-scheme:dark}
+    body{font-family:Inter,system-ui,Segoe UI,Roboto,"Helvetica Neue",Arial; background:linear-gradient(180deg,#051022 0%, #071428 100%); color:#e6eef8; margin:0;padding:18px}
+    .wrap{max-width:960px;margin:0 auto}
+    header{display:flex;gap:12px;align-items:center}
+    h1{font-size:20px;margin:6px 0}
+    p.lead{color:#bcd3ea;margin-top:4px}
+    .grid{display:grid;grid-template-columns:1fr 360px;gap:14px;margin-top:18px}
+    .card{background:rgba(255,255,255,0.02);border-radius:10px;padding:14px;box-shadow:0 6px 18px rgba(2,6,23,0.6)}
+    label{display:block;font-size:13px;color:#b7d0ea;margin-bottom:6px}
+    input[type=number],select,input[type=text]{width:100%;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:rgba(255,255,255,0.02);color:inherit}
+    button{background:var(--accent);border:none;padding:10px 14px;border-radius:8px;color:#012;cursor:pointer;font-weight:600}
+    .small{font-size:13px;color:#9fb6d6}
+    .status{display:flex;gap:8px;align-items:center}
+    .badge{padding:6px 10px;border-radius:999px;font-weight:700}
+    .danger{background:linear-gradient(90deg,#ff7b7b,#ff4d4f);color:#110}
+    .warn{background:linear-gradient(90deg,#ffd59b,#ffb020);color:#110}
+    .safe{background:linear-gradient(90deg,#9dd6ff,#38bdf8);color:#031024}
+    .watch{background:linear-gradient(90deg,#d5f6e8,#6ee7b7);color:#032}
+    .result-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px}
+    .result{flex:1 1 180px;padding:10px;border-radius:8px;background:rgba(255,255,255,0.02)}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .section-title{font-weight:700;margin-bottom:8px}
+    .panel-scroll{max-height:340px;overflow:auto;padding-right:6px}
+    pre{white-space:pre-wrap;background:rgba(0,0,0,0.2);padding:8px;border-radius:8px}
+    footer{margin-top:18px;color:#9fb6d6;font-size:13px}
+    @media(max-width:880px){.grid{grid-template-columns:1fr} .result-row{flex-direction:column}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div>
+        <h1>Hệ thống Cảnh báo Thiên thạch — Demo</h1>
+        <p class="lead">Nhập dữ liệu quan sát để ước tính thời gian tới, năng lượng va chạm và mức cảnh báo. Trang này là bản demo phục vụ mô hình khoa học.</p>
+      </div>
+      <div style="margin-left:auto;text-align:right">
+        <div class="status">
+          <div class="small">Trạng thái:</div>
+          <div id="statusBadge" class="badge safe">SAFE</div>
+        </div>
+        <div class="small">Cập nhật: <span id="updated">-</span></div>
+      </div>
+    </header>
+
+    <div class="grid">
+      <div class="card">
+        <div class="section-title">Bộ tính nhanh</div>
+        <div class="panel-scroll">
+          <label>Khoảng cách hiện tại D (m)</label>
+          <input id="inpD" type="number" min="0" step="any" value="20000">
+
+          <label>Vận tốc tiến tới v (m/s)</label>
+          <input id="inpV" type="number" min="0" step="any" value="200">
+
+          <label>Đường kính ước tính d (m)</label>
+          <input id="inpDIA" type="number" min="0" step="any" value="100">
+
+          <label>Mật độ ước tính ρ (kg/m³) <span class="small">(đá 2000–3000; sắt ~7800)</span></label>
+          <input id="inpRHO" type="number" min="0" step="any" value="2500">
+
+          <div style="margin-top:10px;display:flex;gap:8px">
+            <button id="calcBtn">Tính & Cảnh báo</button>
+            <button id="resetBtn" style="background:#334155;color:#dbeafe">Clear</button>
+            <button id="printBtn" style="background:#e2f1ff;color:#012">In/PDF</button>
+          </div>
+
+          <div class="result-row">
+            <div class="result">
+              <div class="small">Thời gian tới (ước tính)</div>
+              <div id="timeRes" style="font-weight:800;font-size:18px">-</div>
+            </div>
+            <div class="result">
+              <div class="small">Khối lượng ước tính</div>
+              <div id="massRes" style="font-weight:800;font-size:18px">-</div>
+            </div>
+            <div class="result">
+              <div class="small">Năng lượng (J) / (Mt TNT)</div>
+              <div id="energyRes" style="font-weight:800;font-size:18px">-</div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px">
+            <div class="section-title">Mức cảnh báo & hành động nhanh</div>
+            <div id="advice" style="font-size:14px;color:#d7e8ff">Chưa có dữ liệu.</div>
+          </div>
+
+          <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)">
+
+          <div class="section-title">Kịch bản sơ tán (tóm tắt)</div>
+          <div class="small">
+            <ul>
+              <li><b>Vùng Đỏ:</b> rời khỏi nhà ngay, di chuyển đến điểm tập kết gần nhất.</li>
+              <li><b>Vùng Vàng:</b> chuẩn bị, sẵn sàng rời khỏi khu vực khi có lệnh.</li>
+              <li><b>Vùng Xanh:</b> theo dõi thông báo.</li>
+            </ul>
+          </div>
+
+          <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.03)">
+
+          <div class="section-title">Tải tài liệu</div>
+          <div class="actions">
+            <button id="downloadChecklist">Tải Checklist (PDF/TXT)</button>
+            <button id="smsTemplate">Sao chép mẫu SMS</button>
+          </div>
+
+          <div style="margin-top:12px">
+            <div class="section-title">Mô tả phương pháp</div>
+            <div class="small">Trang tính sử dụng công thức vật lý cơ bản (thời gian = D/v; khối lượng từ thể tích cầu & mật độ; năng lượng = 1/2 m v²). Kết quả là ước lượng nhanh, không thay thế thông báo chính thức.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Bản đồ & Thông tin nhanh</div>
+        <div class="small">(Mô phỏng demo) Nhập địa chỉ để kiểm tra xem bạn nằm trong vùng nào.</div>
+        <div style="margin-top:8px">
+          <input id="addr" type="text" placeholder="Nhập địa chỉ / tỉnh, huyện" />
+          <div style="margin-top:8px;display:flex;gap:8px"><button id="checkAddr">Kiểm tra</button><button id="qrBtn" style="background:#fff;color:#012">Tạo QR</button></div>
+        </div>
+
+        <div style="margin-top:12px">
+          <div class="section-title">QR code (in dán)</div>
+          <div id="qrHolder" style="background:rgba(255,255,255,0.02);padding:8px;border-radius:8px;text-align:center">Chưa tạo</div>
+        </div>
+
+        <div style="margin-top:12px">
+          <div class="section-title">Hướng dẫn nhanh cho dân</div>
+          <div class="small panel-scroll" style="max-height:160px">
+            <p><b>1.</b> Khi nghe cảnh báo: calm, theo hướng dẫn lực lượng chức năng.</p>
+            <p><b>2.</b> Mang theo giấy tờ, thuốc, nước.</p>
+            <p><b>3.</b> Trẻ em & người già ưu tiên lên xe trước.</p>
+            <p><b>4.</b> Tránh đường hẹp, chờ hướng dẫn thêm.</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div style="margin-top:12px" class="card">
+      <div class="section-title">Báo cáo kết quả & log thử nghiệm</div>
+      <div class="small"><em>Ghi lại các lần test để tính tỉ lệ thành công</em></div>
+      <pre id="log"></pre>
+    </div>
+
+    <footer>
+      <div>Trang demo — Dùng cho mục đích giáo dục. Không thay thế chỉ đạo của cơ quan chức năng.</div>
+    </footer>
+  </div>
+
+<script>
+  const calcBtn = document.getElementById('calcBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const printBtn = document.getElementById('printBtn');
+  const timeRes = document.getElementById('timeRes');
+  const massRes = document.getElementById('massRes');
+  const energyRes = document.getElementById('energyRes');
+  const advice = document.getElementById('advice');
+  const statusBadge = document.getElementById('statusBadge');
+  const updated = document.getElementById('updated');
+  const log = document.getElementById('log');
+  const downloadChecklist = document.getElementById('downloadChecklist');
+  const smsTemplate = document.getElementById('smsTemplate');
+  const qrBtn = document.getElementById('qrBtn');
+  const qrHolder = document.getElementById('qrHolder');
+  const checkAddr = document.getElementById('checkAddr');
+
+  function now(){return new Date().toLocaleString();}
+  updated.textContent = now();
+
+  function compute(){
+    const D = parseFloat(document.getElementById('inpD').value) || 0; // m
+    const v = parseFloat(document.getElementById('inpV').value) || 0; // m/s
+    const d = parseFloat(document.getElementById('inpDIA').value) || 0; // m
+    const rho = parseFloat(document.getElementById('inpRHO').value) || 2500; // kg/m3
+    if (D<=0 || v<=0 || d<=0){ alert('Vui lòng nhập các giá trị dương cho D, v, d.'); return }
+    const t = D / v; // s
+    const V = (4/3)*Math.PI*Math.pow(d/2,3);
+    const m = rho * V; // kg
+    const E = 0.5 * m * v * v; // J
+    const E_Mt = E / 4.184e15; // megaton
+
+    timeRes.textContent = (t<60? (t.toFixed(1) + ' s') : ( (t/60).toFixed(2) + ' min'));
+    massRes.textContent = formatNumber(m) + ' kg';
+    energyRes.textContent = formatNumber(E) + ' J \n(' + E_Mt.toFixed(3) + ' Mt TNT)';
+
+    updated.textContent = now();
+    log.textContent = now() + '  |  Calc D=' + D + ' m, v=' + v + ' m/s, d=' + d + ' m => E=' + E_Mt.toFixed(3) + ' Mt\n' + log.textContent;
+
+    // set alert level
+    let level='SAFE', cls='safe', msg='Tình trạng an toàn: theo dõi.';
+    if (E_Mt >= 0.1 && E_Mt < 1) { level='WATCH'; cls='watch'; msg='Theo dõi chặt chẽ. Chuẩn bị phương án.' }
+    if (E_Mt >= 1 && E_Mt < 50) { level='ALERT'; cls='warn'; msg='Cảnh báo: chuẩn bị sơ tán vùng ảnh hưởng.' }
+    if (E_Mt >= 50) { level='EVACUATE'; cls='danger'; msg='Mức khẩn cấp: sơ tán diện rộng ngay lập tức.' }
+
+    statusBadge.textContent = level; statusBadge.className = 'badge ' + cls;
+    advice.textContent = msg + ' (Thông tin ước lượng, tham khảo.)';
+  }
+
+  function formatNumber(x){
+    if (x >= 1e9) return (x/1e9).toFixed(3) + ' G';
+    if (x >= 1e6) return (x/1e6).toFixed(3) + ' M';
+    if (x >= 1e3) return (x/1e3).toFixed(3) + ' k';
+    return x.toFixed(2);
+  }
+
+  calcBtn.addEventListener('click', compute);
+  resetBtn.addEventListener('click', ()=>{document.getElementById('inpD').value='';document.getElementById('inpV').value='';document.getElementById('inpDIA').value='';document.getElementById('inpRHO').value='';timeRes.textContent='-';massRes.textContent='-';energyRes.textContent='-';advice.textContent='Chưa có dữ liệu.';statusBadge.textContent='SAFE';statusBadge.className='badge safe';updated.textContent=now();});
+  printBtn.addEventListener('click', ()=>{window.print()});
+
+  downloadChecklist.addEventListener('click', ()=>{
+    const text = `CHECKLIST sơ tán (dùng khẩn cấp):\n- Mang theo giấy tờ, thuốc men, nước tối thiểu 3 ngày.\n- Đèn pin, pin dự phòng, sạc dự phòng.\n- Mặt nạ/khẩu trang, chăn nhỏ.\n- Danh sách người yếu thế & liên hệ.\n- Trưởng hộ báo cho tổ dân phố khi rời nhà.`;
+    const blob = new Blob([text], {type:'text/plain'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'checklist_sotan.txt'; document.body.appendChild(a); a.click(); a.remove();
+  });
+
+  smsTemplate.addEventListener('click', ()=>{
+    const sample = 'ALERT: Thiên thạch có nguy cơ va chạm tại [Địa điểm]. Vui lòng di chuyển tới điểm tập kết [A/B/C]. Mang theo giấy tờ và thuốc.';
+    navigator.clipboard.writeText(sample).then(()=>{ alert('Đã sao chép mẫu SMS vào clipboard.'); });
+  });
+
+  qrBtn.addEventListener('click', ()=>{
+    const url = window.location.href; // demo: link chính
+    // create qr via google chart api
+    const qr = 'https://chart.googleapis.com/chart?cht=qr&chs=200x200&chl=' + encodeURIComponent(url);
+    qrHolder.innerHTML = '<img src="'+qr+'" alt="QR"/>'; 
+  });
+
+  checkAddr.addEventListener('click', ()=>{
+    const a = document.getElementById('addr').value.trim();
+    if(!a){ alert('Nhập địa chỉ hoặc tỉnh, huyện để kiểm tra.'); return }
+    // demo: simple random mapping
+    const rnd = Math.random();
+    let zone='Xanh', text='Bạn đang an toàn.';
+    if (rnd < 0.15) { zone='Đỏ'; text='Bạn nằm trong vùng cần sơ tán. Hãy rời khỏi khu vực ngay.' }
+    else if (rnd < 0.4) { zone='Vàng'; text='Bạn nằm trong vùng chuẩn bị. Chuẩn bị di chuyển.' }
+    else { zone='Xanh'; text='Bạn an toàn, theo dõi thông báo.' }
+    alert('Kết quả kiểm tra cho "'+a+'": vùng ' + zone + '\n' + text);
+  });
+
+</script>
+</body>
+</html>
